@@ -20,10 +20,23 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		81C0673A2DE833AE006CA95A /* MySwiftUIVideoSDK */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				81C0673A2DE833AE006CA95B /* Exceptions */,
+			);
 			path = MySwiftUIVideoSDK;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		81C0673A2DE833AE006CA95B /* Exceptions */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 81C067372DE833AE006CA95A /* MySwiftUIVideoSDK */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		81C067352DE833AE006CA95A /* Frameworks */ = {
@@ -273,6 +286,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MySwiftUIVideoSDK/MySwiftUIVideoSDK.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
@@ -282,6 +296,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Bluetooth audio support";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Video conferencing support";
+				INFOPLIST_FILE = MySwiftUIVideoSDK/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Voice conferencing support";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -306,6 +321,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MySwiftUIVideoSDK/MySwiftUIVideoSDK.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
@@ -315,6 +331,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Bluetooth audio support";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Video conferencing support";
+				INFOPLIST_FILE = MySwiftUIVideoSDK/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Voice conferencing support";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

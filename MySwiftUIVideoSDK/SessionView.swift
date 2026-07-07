@@ -1,8 +1,23 @@
 import SwiftUI
 
 struct SessionView: View {
-    @StateObject private var viewModel = ViewModel()
+    @StateObject private var viewModel: ViewModel
     @Environment(\.dismiss) var dismiss
+
+    // `pending` non-nil => this session came from an answered incoming call: inject its
+    // token/name and join immediately (no JWT prompt). nil => normal in-app join flow.
+    init(pending: CallManager.PendingSession? = nil) {
+        let vm = ViewModel()
+        if let p = pending {
+            vm.jwtToken = p.token
+            vm.sessionName = p.sessionName
+            vm.userName = p.userName
+            vm.callUUID = p.id
+            vm.autoJoin = true
+            vm.inJWTInput = false
+        }
+        _viewModel = StateObject(wrappedValue: vm)
+    }
 
     var body: some View {
         if viewModel.inSession {
@@ -95,6 +110,9 @@ struct SessionView: View {
                         }
                     } message: {
                         Text("You can choose to copy and paste your generated JWT Token here OR leave it as empty if you have added it in the SessionView+Extension jwtToken variable")
+                    }
+                    .onAppear {
+                        if viewModel.autoJoin { viewModel.shouldJoin = true }
                     }
                     .task(id: viewModel.shouldJoin) {
                         guard viewModel.shouldJoin else { return }

@@ -30,10 +30,15 @@ extension SessionView {
          Once you got the token, you can simple copy and paste it below.
          Ensure that the sessionName matches the session name used to generate the JWT Token.
          */
-        let jwtToken = "" // Leave this as empty if you choose to copy and paste your generated JWT token directly in the sample app's alert box after clicking on "Join Session"
-        let sessionName = "" // Also known as tpc in JWT
-        let userName = "" // Display name
+        var jwtToken = "" // Leave this as empty if you choose to copy and paste your generated JWT token directly in the sample app's alert box after clicking on "Join Session"
+        var sessionName = "" // Also known as tpc in JWT
+        var userName = "" // Display name
         let sessionPassword: String = "" // If needed
+
+        // CallKit: the system call this session is tied to. Set for both incoming (from the
+        // answered call) and outgoing (created on join). nil until a call exists.
+        var callUUID: UUID?
+        var autoJoin = false // incoming calls skip the JWT prompt and join immediately
 
         @MainActor func attachLocalVideo(to view: UIView) {
             localView = view
@@ -71,6 +76,12 @@ extension SessionView {
         }
 
         func joinSession() async {
+            // Outgoing call: no CallKit call exists yet, so report one to the system.
+            if callUUID == nil {
+                let uuid = UUID()
+                callUUID = uuid
+                CallManager.shared.startOutgoingCall(uuid: uuid, handle: sessionName)
+            }
             ZoomVideoSDK.shareInstance()?.delegate = self
             let sessionContext = ZoomVideoSDKSessionContext()
             sessionContext.token = jwtToken.isEmpty ? userInputJWT : jwtToken
@@ -90,6 +101,7 @@ extension SessionView {
                 print("Session object: \(session)")
             } else {
                 print("Join session failed")
+                endCallKitCall()
                 DispatchQueue.main.async {
                     self.joinSessionFailed = true
                 }
@@ -99,6 +111,7 @@ extension SessionView {
         func onError(_ ErrorType: ZoomVideoSDKError, detail details: Int) {
             print("Error: \(ErrorType.rawValue) (\(details))")
             if !inSession {
+                endCallKitCall()
                 joinSessionFailed = true
                 leftSession = true
                 errorMessage = "Failed to join session with error: \(ErrorType.rawValue)"
@@ -109,6 +122,7 @@ extension SessionView {
             // Session joined successfully.
             print("Session joined")
             inSession = true
+            if let uuid = callUUID { CallManager.shared.reportOutgoingConnected(uuid: uuid) }
         }
 
         func onUserJoin(_: ZoomVideoSDKUserHelper?, users: [ZoomVideoSDKUser]?) {
@@ -167,6 +181,7 @@ extension SessionView {
         }
 
         func onSessionLeave() {
+            if let uuid = callUUID { CallManager.shared.reportCallEnded(uuid: uuid); callUUID = nil }
             leftSession = true
         }
 
@@ -235,8 +250,20 @@ extension SessionView {
             }
         }
 
+        // Clear the reported CallKit call when a join never completes, so the system doesn't
+        // show a phantom "connecting" call.
+        func endCallKitCall() {
+            if let uuid = callUUID { CallManager.shared.reportCallEnded(uuid: uuid); callUUID = nil }
+        }
+
         func leaveSession() {
-            ZoomVideoSDK.shareInstance()?.leaveSession(true)
+            // Route through CallKit when a system call exists so its UI clears; the
+            // CXEndCallAction handler performs the actual leaveSession.
+            if let uuid = callUUID {
+                CallManager.shared.endCall(uuid: uuid)
+            } else {
+                ZoomVideoSDK.shareInstance()?.leaveSession(true)
+            }
         }
     }
 }

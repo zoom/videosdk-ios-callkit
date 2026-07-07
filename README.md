@@ -25,6 +25,18 @@ This repository demonstrates the basic capabilities of the Video SDK.
 - Creating/joining a session
 - Starting/stopping video
 - Muting/unmuting audio
+- Native call experience via Apple [CallKit](https://developer.apple.com/documentation/callkit) — outgoing calls (system audio priority + Recents) and incoming calls (native ring UI) driven by VoIP pushes
+
+## CallKit
+
+Joining a session reports an outgoing system call; a VoIP push rings a native incoming call that joins the session on answer. The audio session is handed to the SDK in `CXProvider` `didActivate` via `setSDKAudioSessionEnv()` — see `CallManager.swift` and `AppDelegate.swift`.
+
+Incoming calls need an APNs VoIP push. There's no backend, so use `Scripts/VoIPPush.swift` to fire one from your machine — see [Scripts/README.md](Scripts/README.md).
+
+**Requirements (already configured in the project):**
+- `UIBackgroundModes`: `audio`, `voip`, `remote-notification` (`MySwiftUIVideoSDK/Info.plist`)
+- Push Notifications capability / `aps-environment` (`MySwiftUIVideoSDK/MySwiftUIVideoSDK.entitlements` — set to `development`; change to `production` for TestFlight/App Store)
+- A **paid Apple Developer account** and a device to test VoIP pushes (they don't work in the Simulator). Set your team/bundle id and enable Push Notifications in Xcode's Signing & Capabilities.
 
 ## Need Help?
 If you're looking for help, try Developer Support or our Developer Forums. Priority support is also available with Zoom Premier Developer Support plans.
