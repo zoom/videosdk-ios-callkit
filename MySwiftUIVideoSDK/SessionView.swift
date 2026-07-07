@@ -4,19 +4,14 @@ struct SessionView: View {
     @StateObject private var viewModel: ViewModel
     @Environment(\.dismiss) var dismiss
 
-    // `pending` non-nil => this session came from an answered incoming call: inject its
-    // token/name and join immediately (no JWT prompt). nil => normal in-app join flow.
+    // `pending` non-nil => answered incoming call: reuse the view model CallManager already
+    // created and started joining (so audio connects while locked). nil => normal in-app flow.
     init(pending: CallManager.PendingSession? = nil) {
-        let vm = ViewModel()
-        if let p = pending {
-            vm.jwtToken = p.token
-            vm.sessionName = p.sessionName
-            vm.userName = p.userName
-            vm.callUUID = p.id
-            vm.autoJoin = true
-            vm.inJWTInput = false
+        if let p = pending, let vm = CallManager.shared.activeViewModel, vm.callUUID == p.id {
+            _viewModel = StateObject(wrappedValue: vm)
+        } else {
+            _viewModel = StateObject(wrappedValue: ViewModel())
         }
-        _viewModel = StateObject(wrappedValue: vm)
     }
 
     var body: some View {
@@ -110,9 +105,6 @@ struct SessionView: View {
                         }
                     } message: {
                         Text("You can choose to copy and paste your generated JWT Token here OR leave it as empty if you have added it in the SessionView+Extension jwtToken variable")
-                    }
-                    .onAppear {
-                        if viewModel.autoJoin { viewModel.shouldJoin = true }
                     }
                     .task(id: viewModel.shouldJoin) {
                         guard viewModel.shouldJoin else { return }

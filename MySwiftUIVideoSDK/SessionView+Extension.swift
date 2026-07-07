@@ -38,7 +38,8 @@ extension SessionView {
         // CallKit: the system call this session is tied to. Set for both incoming (from the
         // answered call) and outgoing (created on join). nil until a call exists.
         var callUUID: UUID?
-        var autoJoin = false // incoming calls skip the JWT prompt and join immediately
+        var joinUnmutedAudio = false // incoming calls answer already in-call with audio connected
+        private var isOutgoingCall = false // this session initiated the CallKit call (vs. answered)
 
         @MainActor func attachLocalVideo(to view: UIView) {
             localView = view
@@ -77,9 +78,11 @@ extension SessionView {
 
         func joinSession() async {
             // Outgoing call: no CallKit call exists yet, so report one to the system.
+            // (Incoming calls arrive with callUUID already set by CallManager.)
             if callUUID == nil {
                 let uuid = UUID()
                 callUUID = uuid
+                isOutgoingCall = true
                 CallManager.shared.startOutgoingCall(uuid: uuid, handle: sessionName)
             }
             ZoomVideoSDK.shareInstance()?.delegate = self
@@ -91,7 +94,10 @@ extension SessionView {
             videoOption.localVideoOn = true
             sessionContext.videoOption = videoOption
             let audioOtion = ZoomVideoSDKAudioOptions()
-            audioOtion.mute = true
+            // Incoming calls answer in-call (audio connected, unmuted); otherwise keep the
+            // original behavior (not connected, muted) until the user taps unmute.
+            audioOtion.connect = joinUnmutedAudio
+            audioOtion.mute = !joinUnmutedAudio
             sessionContext.audioOption = audioOtion
             if !sessionPassword.isEmpty {
                 sessionContext.sessionPassword = sessionPassword
@@ -122,7 +128,9 @@ extension SessionView {
             // Session joined successfully.
             print("Session joined")
             inSession = true
-            if let uuid = callUUID { CallManager.shared.reportOutgoingConnected(uuid: uuid) }
+            if joinUnmutedAudio { audioOn = true } // mic button reflects the connected audio
+            // Only outgoing calls need connect confirmation; answered calls are already connected.
+            if isOutgoingCall, let uuid = callUUID { CallManager.shared.reportOutgoingConnected(uuid: uuid) }
         }
 
         func onUserJoin(_: ZoomVideoSDKUserHelper?, users: [ZoomVideoSDKUser]?) {
@@ -181,7 +189,7 @@ extension SessionView {
         }
 
         func onSessionLeave() {
-            if let uuid = callUUID { CallManager.shared.reportCallEnded(uuid: uuid); callUUID = nil }
+            endCallKitCall()
             leftSession = true
         }
 

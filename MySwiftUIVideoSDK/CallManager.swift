@@ -18,6 +18,10 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
         let userName: String
     }
 
+    /// The session's view model, created here (not by the view) so an answered call joins
+    /// immediately — even while locked, when SwiftUI won't render the view yet.
+    private(set) var activeViewModel: SessionView.ViewModel?
+
     private let provider: CXProvider
     private let callController = CXCallController()
     // Incoming call details, held from the VoIP push until the user answers.
@@ -30,7 +34,9 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
         config.supportedHandleTypes = [.generic]
         provider = CXProvider(configuration: config)
         super.init()
-        provider.setDelegate(self, queue: nil) // nil == main queue
+        // Main queue: the Zoom SDK must be called on the main thread, and all our delegate
+        // methods touch it (join/leave/audio session).
+        provider.setDelegate(self, queue: .main)
     }
 
     // MARK: Outgoing (user taps Join in-app)
@@ -73,6 +79,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
         provider.reportCall(with: uuid, endedAt: nil, reason: .remoteEnded)
         incoming[uuid] = nil
         pendingSession = nil
+        activeViewModel = nil
     }
 
     // MARK: CXProviderDelegate
@@ -80,6 +87,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
     func providerDidReset(_ provider: CXProvider) {
         incoming.removeAll()
         pendingSession = nil
+        activeViewModel = nil
         ZoomVideoSDK.shareInstance()?.leaveSession(true)
     }
 
@@ -90,8 +98,21 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        // Present SessionView, which joins the session (single SDK delegate lives there).
-        pendingSession = incoming[action.callUUID]
+        guard let session = incoming[action.callUUID] else { action.fail(); return }
+        // Join now (not from the view's onAppear) so audio connects even while the device is
+        // locked. Delegate is delivered on .main, so we're safely on the main thread here.
+        MainActor.assumeIsolated {
+            let vm = SessionView.ViewModel()
+            vm.jwtToken = session.token
+            vm.sessionName = session.sessionName
+            vm.userName = session.userName
+            vm.callUUID = session.id
+            vm.joinUnmutedAudio = true // answer already in-call with audio
+            vm.inJWTInput = false      // no JWT prompt for an answered call
+            activeViewModel = vm
+            pendingSession = session   // SessionView reuses this same vm when it renders
+            Task { await vm.joinSession() }
+        }
         action.fulfill()
     }
 
@@ -99,6 +120,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
         ZoomVideoSDK.shareInstance()?.leaveSession(true)
         incoming[action.callUUID] = nil
         pendingSession = nil
+        activeViewModel = nil
         action.fulfill()
     }
 

@@ -4,16 +4,21 @@ import PushKit
 /// Present only for PushKit — SwiftUI has no app delegate, but VoIP pushes must be handled at
 /// the process level. Wired in via `@UIApplicationDelegateAdaptor` in the App struct.
 final class AppDelegate: NSObject, UIApplicationDelegate, PKPushRegistryDelegate {
+    // Must be a stored property: PKPushRegistry holds its delegate weakly, so a local would
+    // deallocate and no pushes/token would ever arrive.
+    private var pushRegistry: PKPushRegistry?
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         let registry = PKPushRegistry(queue: .main)
         registry.delegate = self
         registry.desiredPushTypes = [.voIP]
+        pushRegistry = registry
         return true
     }
 
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
-        // ponytail: just log it — a real app POSTs this to your backend. Feed it to Scripts/send_voip_push.sh.
+        // ponytail: just log it — a real app POSTs this to your backend. Feed it to Scripts/VoIPPush.swift.
         print("VoIP device token: \(token)")
     }
 
