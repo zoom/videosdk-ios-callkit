@@ -30,7 +30,7 @@ extension SessionView {
          Once you got the token, you can simple copy and paste it below.
          Ensure that the sessionName matches the session name used to generate the JWT Token.
          */
-        var jwtToken = "" // Leave this as empty if you choose to copy and paste your generated JWT token directly in the sample app's alert box after clicking on "Join Session"
+        var jwtToken = "" // Leave this empty to paste a generated JWT into the CallKit sample after tapping "Join Session"
         var sessionName = "" // Also known as tpc in JWT
         var userName = "" // Display name
         let sessionPassword: String = "" // If needed
@@ -83,7 +83,13 @@ extension SessionView {
                 let uuid = UUID()
                 callUUID = uuid
                 isOutgoingCall = true
-                CallManager.shared.startOutgoingCall(uuid: uuid, handle: sessionName)
+                guard await CallManager.shared.startOutgoingCall(uuid: uuid, handle: sessionName, viewModel: self) else {
+                    callUUID = nil
+                    isOutgoingCall = false
+                    errorMessage = "Unable to start the system call."
+                    joinSessionFailed = true
+                    return
+                }
             }
             ZoomVideoSDK.shareInstance()?.delegate = self
             let sessionContext = ZoomVideoSDKSessionContext()
@@ -94,9 +100,9 @@ extension SessionView {
             videoOption.localVideoOn = true
             sessionContext.videoOption = videoOption
             let audioOtion = ZoomVideoSDKAudioOptions()
-            // Incoming calls answer in-call (audio connected, unmuted); otherwise keep the
-            // original behavior (not connected, muted) until the user taps unmute.
-            audioOtion.connect = joinUnmutedAudio
+            // CallKit owns an active audio session, so join audio for every reported call.
+            // Outgoing calls start muted; answered incoming calls start unmuted.
+            audioOtion.connect = true
             audioOtion.mute = !joinUnmutedAudio
             sessionContext.audioOption = audioOtion
             if !sessionPassword.isEmpty {
@@ -107,7 +113,8 @@ extension SessionView {
                 print("Session object: \(session)")
             } else {
                 print("Join session failed")
-                endCallKitCall()
+                failCallKitCall()
+                errorMessage = "Failed to join the session."
                 DispatchQueue.main.async {
                     self.joinSessionFailed = true
                 }
@@ -117,9 +124,8 @@ extension SessionView {
         func onError(_ ErrorType: ZoomVideoSDKError, detail details: Int) {
             print("Error: \(ErrorType.rawValue) (\(details))")
             if !inSession {
-                endCallKitCall()
+                failCallKitCall()
                 joinSessionFailed = true
-                leftSession = true
                 errorMessage = "Failed to join session with error: \(ErrorType.rawValue)"
             }
         }
@@ -127,10 +133,23 @@ extension SessionView {
         func onSessionJoin() {
             // Session joined successfully.
             print("Session joined")
+            if let uuid = callUUID {
+                if isOutgoingCall {
+                    guard CallManager.shared.reportOutgoingConnected(uuid: uuid) else {
+                        callUUID = nil
+                        ZoomVideoSDK.shareInstance()?.leaveSession(true)
+                        return
+                    }
+                } else {
+                    guard CallManager.shared.reportIncomingConnected(uuid: uuid) else {
+                        callUUID = nil
+                        ZoomVideoSDK.shareInstance()?.leaveSession(true)
+                        return
+                    }
+                }
+            }
             inSession = true
-            if joinUnmutedAudio { audioOn = true } // mic button reflects the connected audio
-            // Only outgoing calls need connect confirmation; answered calls are already connected.
-            if isOutgoingCall, let uuid = callUUID { CallManager.shared.reportOutgoingConnected(uuid: uuid) }
+            if joinUnmutedAudio { audioOn = true }
         }
 
         func onUserJoin(_: ZoomVideoSDKUserHelper?, users: [ZoomVideoSDKUser]?) {
@@ -188,8 +207,17 @@ extension SessionView {
             }
         }
 
+        func onUserAudioStatusChanged(_: ZoomVideoSDKAudioHelper?, user: [ZoomVideoSDKUser]?) {
+            guard let myself = ZoomVideoSDK.shareInstance()?.getSession()?.getMySelf(),
+                  user?.contains(where: { $0.getID() == myself.getID() }) == true,
+                  let status = myself.audioStatus()
+            else { return }
+            audioOn = status.audioType != .none && !status.isMuted
+        }
+
         func onSessionLeave() {
             endCallKitCall()
+            inSession = false
             leftSession = true
         }
 
@@ -229,31 +257,16 @@ extension SessionView {
             {
                 // Check if the user's audio type is none - Not connected yet
                 if audioStatus.audioType == .none {
-                    Task(priority: .background) {
-                        await MainActor.run {
-                            audioHelper.startAudio()
-                            audioOn = true
-                        }
-                    }
+                    let error = audioHelper.startAudio()
+                    print("Start audio error: \(error.rawValue)")
+                    if error == .Errors_Success { audioOn = true }
+                } else if let uuid = callUUID {
+                    // Route mute changes through CallKit so the system UI and SDK stay aligned.
+                    CallManager.shared.setMuted(uuid: uuid, isMuted: !audioStatus.isMuted)
                 } else {
-                    // Audio is connected - Toggle audio based on mute status
-                    if audioStatus.isMuted {
-                        Task(priority: .background) {
-                            await MainActor.run {
-                                let error = audioHelper.unmuteAudio(myUser)
-                                print("Unmute error: \(error.rawValue)")
-                                audioOn = true
-                            }
-                        }
-                    } else {
-                        Task(priority: .background) {
-                            await MainActor.run {
-                                let error = audioHelper.muteAudio(myUser)
-                                print("Mute error: \(error.rawValue)")
-                                audioOn = false
-                            }
-                        }
-                    }
+                    let error = audioStatus.isMuted ? audioHelper.unmuteAudio(myUser) : audioHelper.muteAudio(myUser)
+                    print("Toggle audio error: \(error.rawValue)")
+                    if error == .Errors_Success { audioOn = audioStatus.isMuted }
                 }
             }
         }
@@ -262,6 +275,12 @@ extension SessionView {
         // show a phantom "connecting" call.
         func endCallKitCall() {
             if let uuid = callUUID { CallManager.shared.reportCallEnded(uuid: uuid); callUUID = nil }
+            isOutgoingCall = false
+        }
+
+        func failCallKitCall() {
+            if let uuid = callUUID { CallManager.shared.reportCallFailed(uuid: uuid); callUUID = nil }
+            isOutgoingCall = false
         }
 
         func leaveSession() {

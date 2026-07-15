@@ -41,6 +41,10 @@ let keyID       = require(env("KEY_ID"), "KEY_ID")
 let teamID      = require(env("TEAM_ID"), "TEAM_ID")
 let bundleID    = require(env("BUNDLE_ID"), "BUNDLE_ID")
 let apnsEnv     = env("APNS_ENV") ?? "sandbox" // "sandbox" for dev builds, "prod" for TestFlight/App Store
+guard apnsEnv == "sandbox" || apnsEnv == "prod" else {
+    FileHandle.standardError.write("APNS_ENV must be sandbox or prod\n".data(using: .utf8)!)
+    exit(1)
+}
 
 let deviceToken = require(args.count > 0 ? args[0] : nil, "deviceToken (arg 1)")
 let sessionName = require(args.count > 1 ? args[1] : nil, "sessionName (arg 2)")
@@ -79,10 +83,13 @@ req.setValue("bearer \(providerToken())", forHTTPHeaderField: "authorization")
 req.setValue("\(bundleID).voip", forHTTPHeaderField: "apns-topic")
 req.setValue("voip", forHTTPHeaderField: "apns-push-type")
 req.setValue("10", forHTTPHeaderField: "apns-priority")
+req.setValue("0", forHTTPHeaderField: "apns-expiration")
 
 // Payload the app's AppDelegate reads. ponytail: JWT sent inline for testing; fetch it
 // server-side on answer in production.
 let body: [String: Any] = [
+    "aps": ["content-available": 1],
+    "callUUID": UUID().uuidString,
     "sessionName": sessionName,
     "token": vsdkJWT,
     "userName": env("USER_NAME") ?? "Me",
@@ -93,9 +100,17 @@ req.httpBody = try! JSONSerialization.data(withJSONObject: body)
 let sem = DispatchSemaphore(value: 0)
 URLSession.shared.dataTask(with: req) { data, response, error in
     defer { sem.signal() }
-    if let error { print("Error: \(error)"); return }
+    if let error {
+        print("Error: \(error)")
+        exit(1)
+    }
     let code = (response as? HTTPURLResponse)?.statusCode ?? -1
     let reason = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-    print(code == 200 ? "Sent (200)" : "APNs \(code): \(reason)")
+    if code == 200 {
+        print("Sent (200)")
+    } else {
+        print("APNs \(code): \(reason)")
+        exit(1)
+    }
 }.resume()
 sem.wait()
