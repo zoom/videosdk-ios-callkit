@@ -37,7 +37,7 @@ swift Scripts/JWTGenerator.swift TestSession12345 1 YourSDKKey YourSDKSecret
 
 ## Output
 
-The script prints the JWT token to stdout (one line). You can copy it directly and add it under the JWT token field in the sample app project.
+The script prints the JWT token to stdout (one line). You can copy it directly and add it under the JWT token field in the CallKit sample.
 
 ## Troubleshooting
 
@@ -89,5 +89,5 @@ swift Scripts/VoIPPush.swift 6a1f...c9 TestSession12345 eyJ0eXAi... "Alice"
 ```
 
 On success it prints `Sent (200)` and the device shows the native incoming-call UI.
-Answering joins the Video SDK session with that token.
-
+Answering joins the Video SDK session with that token. The sender adds a stable call UUID and
+sets immediate APNs expiry so an undelivered call cannot ring later.

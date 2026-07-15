@@ -15,6 +15,14 @@ struct SessionView: View {
     }
 
     var body: some View {
+        content
+            .onChange(of: viewModel.leftSession) { _, leftSession in
+                if leftSession { dismiss() }
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if viewModel.inSession {
             NavigationStack {
                 ScrollView {
@@ -120,7 +128,6 @@ struct SessionView: View {
             }
         }
     }
-    
 }
 
 #Preview {

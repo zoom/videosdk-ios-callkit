@@ -1,5 +1,6 @@
 import UIKit
 import PushKit
+import ZoomVideoSDK
 
 /// Present only for PushKit — SwiftUI has no app delegate, but VoIP pushes must be handled at
 /// the process level. Wired in via `@UIApplicationDelegateAdaptor` in the App struct.
@@ -9,6 +10,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, PKPushRegistryDelegate
     private var pushRegistry: PKPushRegistry?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        let initParams = ZoomVideoSDKInitParams()
+        initParams.domain = "zoom.us"
+        let result = ZoomVideoSDK.shareInstance()?.initialize(initParams)
+        if result == .Errors_Success {
+            print("SDK initialization succeeded")
+        } else if let result {
+            print("SDK initialization failed: \(result)")
+        }
+
         let registry = PKPushRegistry(queue: .main)
         registry.delegate = self
         registry.desiredPushTypes = [.voIP]
@@ -26,7 +36,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, PKPushRegistryDelegate
     /// `completion()`, or the app is killed. Bad/empty payload -> report then immediately end.
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
         let dict = payload.dictionaryPayload
-        let uuid = UUID()
+        let payloadUUID = (dict["callUUID"] as? String).flatMap(UUID.init(uuidString:))
+        let uuid = payloadUUID ?? UUID()
         let session = CallManager.PendingSession(
             id: uuid,
             token: dict["token"] as? String ?? "",
@@ -34,10 +45,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, PKPushRegistryDelegate
             userName: dict["userName"] as? String ?? "Me"
         )
         CallManager.shared.reportIncomingCall(uuid: uuid, session: session, callerName: dict["callerName"] as? String ?? "") {
-            if session.token.isEmpty || session.sessionName.isEmpty {
-                CallManager.shared.reportCallEnded(uuid: uuid) // nothing to join
+            if payloadUUID == nil || session.token.isEmpty || session.sessionName.isEmpty {
+                CallManager.shared.reportCallFailed(uuid: uuid) // nothing to join
             }
             completion()
         }
+    }
+
+    func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+        print("VoIP device token invalidated")
     }
 }
