@@ -68,11 +68,11 @@ provisioning profile with Push Notifications + the VoIP background mode).
 3. Fill in `Scripts/.env` (or export as env vars):
 
    ```bash
-   AUTH_KEY_PATH=/absolute/path/to/AuthKey_XXXX.p8
-   KEY_ID=XXXXXXXXXX
-   TEAM_ID=YYYYYYYYYY
-   BUNDLE_ID=com.your.bundleid       # the app's bundle id; topic sent is <BUNDLE_ID>.voip
-   APNS_ENV=sandbox                  # sandbox for dev builds; prod for TestFlight/App Store
+    AUTH_KEY_PATH=/absolute/path/to/AuthKey_XXXX.p8
+    KEY_ID=XXXXXXXXXX
+    TEAM_ID=YYYYYYYYYY
+    BUNDLE_ID=com.your.bundleid       # the app's bundle id; topic sent is <BUNDLE_ID>.voip
+    APNS_ENV=sandbox                  # sandbox for dev builds; prod for TestFlight/App Store
    ```
 
 ## Usage
