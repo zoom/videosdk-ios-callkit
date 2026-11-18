@@ -107,7 +107,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
             print("endCall error: \(error)")
             DispatchQueue.main.async {
                 if self?.activeCallUUID == uuid {
-                    ZoomVideoSDK.shareInstance()?.leaveSession(true)
+                    ZoomVideoSDK.sharedInstance()?.leaveSession(true)
                 }
                 self?.reportCallFailed(uuid: uuid)
             }
@@ -164,7 +164,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
         pendingSession = nil
         activeCallUUID = nil
         activeViewModel = nil
-        ZoomVideoSDK.shareInstance()?.leaveSession(true)
+        ZoomVideoSDK.sharedInstance()?.leaveSession(true)
     }
 
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
@@ -201,7 +201,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
         pendingAnswerActions.removeValue(forKey: action.callUUID)?.fail()
         if activeCallUUID == action.callUUID {
-            ZoomVideoSDK.shareInstance()?.leaveSession(true)
+            ZoomVideoSDK.sharedInstance()?.leaveSession(true)
         }
         clearCall(uuid: action.callUUID)
         action.fulfill()
@@ -209,8 +209,8 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
 
     func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         guard activeCallUUID == action.callUUID,
-              let audioHelper = ZoomVideoSDK.shareInstance()?.getAudioHelper(),
-              let myUser = ZoomVideoSDK.shareInstance()?.getSession()?.getMySelf()
+              let audioHelper = ZoomVideoSDK.sharedInstance()?.getAudioHelper(),
+              let myUser = ZoomVideoSDK.sharedInstance()?.getSession()?.getMySelf()
         else {
             action.fail()
             return
@@ -234,7 +234,7 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
 
         pendingAnswerActions.removeValue(forKey: callAction.callUUID)
         if activeCallUUID == callAction.callUUID {
-            ZoomVideoSDK.shareInstance()?.leaveSession(true)
+            ZoomVideoSDK.sharedInstance()?.leaveSession(true)
         }
         provider.reportCall(with: callAction.callUUID, endedAt: nil, reason: .failed)
         clearCall(uuid: callAction.callUUID)
@@ -243,6 +243,6 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
     // Let CallKit own the AVAudioSession; hand it to the SDK once activated.
     // Do NOT call AVAudioSession.setActive yourself — it corrupts SDK audio output.
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
-        ZoomVideoSDK.shareInstance()?.getAudioHelper()?.setSDKAudioSessionEnv()
+        ZoomVideoSDK.sharedInstance()?.getAudioHelper()?.setSDKAudioSessionEnv()
     }
 }

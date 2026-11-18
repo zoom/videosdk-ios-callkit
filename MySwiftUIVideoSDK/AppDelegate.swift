@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, PKPushRegistryDelegate
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         let initParams = ZoomVideoSDKInitParams()
         initParams.domain = "zoom.us"
-        let result = ZoomVideoSDK.shareInstance()?.initialize(initParams)
+        let result = ZoomVideoSDK.sharedInstance()?.initialize(initParams)
         if result == .Errors_Success {
             print("SDK initialization succeeded")
         } else if let result {
